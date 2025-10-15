@@ -1,3 +1,4 @@
 streamlit==1.35.0  # Örnek bir kararlı sürüm
 pandas==2.2.2      # Örnek bir kararlı sürüm
 openpyxl==3.1.2    # Örnek bir kararlı sürüm
+Python 3.13.8 
