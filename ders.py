@@ -43,4 +43,3 @@ if uploaded_file:
         if question:
             answer = qa_pipeline(question=question, context=text)
             st.markdown(f"**Cevap:** {answer['answer']}")
-
