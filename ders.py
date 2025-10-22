@@ -1,45 +1,76 @@
 import streamlit as st
 import PyPDF2
+import requests
+from io import BytesIO
 from transformers import pipeline
 
-st.title("PDF Sayfa Okuma ve Özet Çıkarma (Türkçe)")
+# --- Başlık ---
+st.title("📘 PDF Özetleme ve Soru-Cevap Uygulaması")
 
-# PDF yükleme
-pdf_file = st.file_uploader("PDF dosyasını yükleyin", type="pdf")
+# --- GitHub PDF URL'si girişi ---
+pdf_url = st.text_input("📎 GitHub PDF dosya URL'si girin (örnek: https://github.com/.../dosya.pdf):")
 
-if pdf_file is not None:
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
-    total_pages = len(pdf_reader.pages)
-    st.write(f"PDF sayfa sayısı: {total_pages}")
+# --- Sayfa aralığı seçimi ---
+page_range = st.text_input("📄 Özetlenecek sayfa aralığı (örnek: 2-5):")
 
-    # Sayfa aralığı seçimi
-    start_page = st.number_input("Başlangıç sayfası", min_value=1, max_value=total_pages, value=1)
-    end_page = st.number_input("Bitiş sayfası", min_value=1, max_value=total_pages, value=total_pages)
+# --- Model yükleme ---
+@st.cache_resource
+def load_models():
+    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+    qa_model = pipeline("question-answering", model="deepset/roberta-base-squad2")
+    return summarizer, qa_model
 
-    if st.button("Özetle"):
-        if start_page > end_page:
-            st.error("Başlangıç sayfası bitiş sayfasından büyük olamaz!")
-        else:
-            # Seçilen sayfaları oku
-            text = ""
-            for i in range(start_page-1, end_page):
-                page = pdf_reader.pages[i]
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+summarizer, qa_model = load_models()
+
+# --- PDF okuma fonksiyonu ---
+def read_pdf_from_url(url, start_page, end_page):
+    response = requests.get(url)
+    pdf_file = BytesIO(response.content)
+    reader = PyPDF2.PdfReader(pdf_file)
+    text = ""
+    for i in range(start_page - 1, end_page):
+        if i < len(reader.pages):
+            text += reader.pages[i].extract_text() + "\n"
+    return text
+
+# --- İşlem başlat ---
+if st.button("📖 PDF'yi Oku ve Özetle"):
+    if pdf_url and page_range:
+        try:
+            start, end = map(int, page_range.split('-'))
+            pdf_text = read_pdf_from_url(pdf_url, start, end)
+
+            with st.spinner("Özet çıkarılıyor..."):
+                summary = summarizer(pdf_text, max_length=250, min_length=50, do_sample=False)[0]['summary_text']
             
-            if text.strip() == "":
-                st.warning("PDF’den metin çıkarılamadı.")
-            else:
-                # Hugging Face özetleme pipeline
-                summarizer = pipeline("summarization", model="t5-base")  # Türkçe için t5-base, dil Türkçe değilse mBART/mt5 önerilir
-                # Uzun metinleri parçala
-                max_chunk = 1000
-                chunks = [text[i:i+max_chunk] for i in range(0, len(text), max_chunk)]
-                summary_text = ""
-                for chunk in chunks:
-                    summary = summarizer(chunk, max_length=150, min_length=50, do_sample=False)
-                    summary_text += summary[0]['summary_text'] + "\n"
+            st.subheader("📜 Özet:")
+            st.write(summary)
 
-                st.subheader("Özet")
-                st.write(summary_text)
+            with st.spinner("Soru-Cevap üretiliyor..."):
+                example_questions = [
+                    "Bu bölümün ana fikri nedir?",
+                    "Metinde hangi konu ele alınmıştır?",
+                    "Önemli detaylar nelerdir?"
+                ]
+                for q in example_questions:
+                    ans = qa_model(question=q, context=summary)
+                    st.markdown(f"**❓ {q}**")
+                    st.write(f"💬 {ans['answer']}")
+            
+            # Kullanıcı kendi sorusunu sorsun
+            st.subheader("🔎 Kendi Sorunu Sor:")
+            user_q = st.text_input("Sorunuzu yazın:")
+            if st.button("Cevapla"):
+                if user_q.strip():
+                    ans = qa_model(question=user_q, context=summary)
+                    st.markdown(f"**❓ {user_q}**")
+                    st.write(f"💬 {ans['answer']}")
+        except Exception as e:
+            st.error(f"Hata: {e}")
+    else:
+        st.warning("Lütfen PDF URL'si ve sayfa aralığını girin.")
+
+# --- Çıkış butonu ---
+if st.button("🚪 Çıkış"):
+    st.success("Uygulama kapatılıyor...")
+    st.stop()
