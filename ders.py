@@ -5,10 +5,10 @@ from io import BytesIO
 from transformers import pipeline
 
 # --- Başlık ---
-st.title("📘 PDF Özetleme ve Soru-Cevap Uygulaması")
+st.title("📘 PDF Özetleme ve Soru-Cevap Uygulaması") 
 
 # --- GitHub PDF URL'si girişi ---
-pdf_url = st.text_input("📎 GitHub PDF dosya URL'si girin (örnek: https://github.com/.../edebiyat.pdf):")
+pdf_url = st.text_input("📎 GitHub PDF dosya URL'si girin (örnek: https://github.com/ismbey55-maker/deneme/blob/main/edebiyat.pdf):")
 
 # --- Sayfa aralığı seçimi ---
 page_range = st.text_input("📄 Özetlenecek sayfa aralığı (örnek: 2-5):")
